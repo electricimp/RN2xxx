@@ -172,3 +172,7 @@ function loraInitHandler(err) {
 // Initialize LoRa Radio and open a receive handler
 lora.init(RN2xxx.RN2903_BANNER loraInitHandler);
 ```
+
+## License
+
+The RN2xxx library is licensed under the [MIT License](/LICENSE).

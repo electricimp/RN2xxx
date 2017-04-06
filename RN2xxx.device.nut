@@ -49,11 +49,15 @@ class RN2xxx {
 
     // Variables
     _timeout = null;
-    _buffer = null;
-    _receiveHandler = null;
     _init = false;
     _initCB = null;
     _banner = null;
+
+    _buffer = null;
+    _receiveHandler = null;
+
+    _sending = false;
+    _sendQueue = null;
 
     // Debug logging flag
     _debug = null;
@@ -63,6 +67,7 @@ class RN2xxx {
         _reset = reset;
         _uart = uart;
         _clearBuffer();
+        _sendQueue = [];
 
         _reset.configure(DIGITAL_OUT, 1);
     }
@@ -75,13 +80,13 @@ class RN2xxx {
         // Set banner
         _banner = banner;
 
-        // Reset device
+        // Hold reset pin low (active)
         _reset.write(0);
         // Start initialization timeout timer
         _timeout = imp.wakeup(INIT_TIMEOUT, _initTimeoutHandler.bindenv(this));
-        // Configure UART
+        // Configure UART, _uartReceive handler will receive a banner to check
         _uart.configure(BAUD_RATE, WORD_SIZE, PARITY_NONE, STOP_BITS, NO_CTSRTS, _uartReceive.bindenv(this));
-        // Release Reset pin
+        // Release reset pin
         _reset.write(1);
     }
 
@@ -92,8 +97,13 @@ class RN2xxx {
     }
 
     function send(cmd) {
-        _log("sent: "+ cmd);
-        _uart.write(cmd+"\r\n");
+        if (_sending) {
+            _sendQueue.push(cmd);
+        } else {
+            _sending = true;
+            _log("sent: "+ cmd);
+            _uart.write(cmd+"\r\n");
+        }
     }
 
     function setReceiveHandler(cb) {
@@ -102,13 +112,26 @@ class RN2xxx {
 
     function _uartReceive() {
         local b = _uart.read();
+        // Only printable charaters are expected in a response
+        // All responses end in a line feed
         while(b >= 0) {
+            // Add expected charaters to buffer
             if (b >= FIRST_ASCII_PRINTABLE_CHAR) {
                 _buffer += b.tochar();
+            // We received a complete response, process it
             } else if (b == LINE_FEED) {
-                // we have a line of data
-                _log("received: "+_buffer);
-                // pass buffer to handler
+                // Debug log received data
+                _log("received: " + _buffer);
+
+                // Send next command
+                if (!_init && _sendQueue.len() > 0) {
+                    // Toggle _sending flag
+                    _sending = false;
+                    // Send next command
+                    send(_sendQueue.remove(0));
+                }
+
+                // Pass recieved data to handler & clear buffer
                 if (_init) {
                     _checkBanner(_buffer);
                 } else if (_receiveHandler) {
@@ -131,7 +154,7 @@ class RN2xxx {
 
         local err = null;
 
-        // check for the expected banner
+        // Check for the expected banner
         if (data.slice(0, _banner.len()) != _banner) {
             _log( data.slice(0, _banner.len()) );
             err = ERROR_BANNER_MISMATCH;
