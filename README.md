@@ -14,7 +14,7 @@ The constructor takes two required parameters to instantiate the class: *uart* t
 local UART = hardware.uart1;
 local RESET_PIN = hardware.pinH;
 
-lora <- LoRa_RN2xxx(UART, RESET_PIN);
+lora <- RN2xxx(UART, RESET_PIN);
 ```
 
 ## Class Methods
@@ -123,7 +123,7 @@ initCommands <- [ format("%s mod %s", RADIO_SET, RADIO_MODE),
 
 local UART = hardware.uart1;
 local RESET_PIN = hardware.pinH;
-lora <- LoRa_RN2483(UART, RESET_PIN);
+lora <- RN2xxx(UART, RESET_PIN);
 
 function receive(data) {
     if (data.len() > 10 && data.slice(0,10) == "radio_rx  ") {
@@ -152,6 +152,7 @@ function sendNextInitCmd(data = null) {
         // Send command to LoRa
         lora.send(command);
     } else {
+        server.log("LoRa radio in receive mode...");
         // Radio ready to receive, set to our receive handler
         lora.setReceiveHandler(receive.bindenv(this));
     }
