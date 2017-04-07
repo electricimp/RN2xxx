@@ -49,7 +49,7 @@ class RN2xxx {
 
     // Variables
     _timeout = null;
-    _init = false;
+    _inReset = false;
     _initCB = null;
     _banner = null;
 
@@ -73,8 +73,8 @@ class RN2xxx {
     }
 
     function init(banner, cb = null) {
-        // Set init flag
-        _init = true;
+        // Set reset flag
+        _inReset = true;
         // Set init callback
         _initCB = cb;
         // Set banner
@@ -91,6 +91,8 @@ class RN2xxx {
     }
 
     function hwReset() {
+        // Toggle reset flag
+        _inReset = true;
         _reset.write(0);
         imp.sleep(0.01);
         _reset.write(1);
@@ -124,7 +126,7 @@ class RN2xxx {
                 _log("received: " + _buffer);
 
                 // Send next command
-                if (!_init && _sendQueue.len() > 0) {
+                if (!_inReset && _sendQueue.len() > 0) {
                     // Toggle _sending flag
                     _sending = false;
                     // Send next command
@@ -132,8 +134,13 @@ class RN2xxx {
                 }
 
                 // Pass recieved data to handler & clear buffer
-                if (_init) {
-                    _checkBanner(_buffer);
+                if (_inReset) {
+                    // Only check banner if we have one
+                    if (_banner) {
+                        _checkBanner(_buffer);
+                    } else {
+                        _inReset = false;
+                    }
                 } else if (_receiveHandler) {
                     _receiveHandler(_buffer);
                 }
@@ -166,14 +173,14 @@ class RN2xxx {
             server.error(err);
         }
 
-        // Clear init flag
-        _init = false;
+        // Clear reset flag
+        _inReset = false;
     }
 
     function _initTimeoutHandler() {
         (_initCB) ? _initCB(ERROR_BANNER_TIMEOUT) : server.error(ERROR_BANNER_TIMEOUT);
-        // Clear init flag
-        _init = false;
+        // Clear reset flag
+        _inReset = false;
         _timeout = null;
     }
 
