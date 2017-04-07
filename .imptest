@@ -1,0 +1,14 @@
+{
+    "modelId": "fjjqC6Db5wUV" /* LoRa_testing */,
+    "devices": [
+        "5000d8c46a5644ec" /* 5000d8c46a5644ec */
+    ],
+    "agentFile": false,
+    "deviceFile": "RN2xxx.device.nut",
+    "stopOnFailure": false,
+    "timeout": 30,
+    "tests": [
+        "*.test.nut",
+        "tests/**/*.test.nut"
+    ]
+}

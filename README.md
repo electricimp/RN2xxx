@@ -123,7 +123,7 @@ initCommands <- [ format("%s mod %s", RADIO_SET, RADIO_MODE),
 
 local UART = hardware.uart1;
 local RESET_PIN = hardware.pinH;
-lora <- RN2xxx(UART, RESET_PIN);
+lora <- RN2xxx(UART, RESET_PIN, true);
 
 function receive(data) {
     if (data.len() > 10 && data.slice(0,10) == "radio_rx  ") {

@@ -99,7 +99,7 @@ class RN2xxx {
     }
 
     function send(cmd) {
-        if (_sending) {
+        if (_sending || _inReset) {
             _sendQueue.push(cmd);
         } else {
             _sending = true;
@@ -125,25 +125,38 @@ class RN2xxx {
                 // Debug log received data
                 _log("received: " + _buffer);
 
-                // Send next command
-                if (!_inReset && _sendQueue.len() > 0) {
-                    // Toggle _sending flag
-                    _sending = false;
-                    // Send next command
-                    send(_sendQueue.remove(0));
-                }
-
                 // Pass recieved data to handler & clear buffer
                 if (_inReset) {
                     // Only check banner if we have one
                     if (_banner) {
-                        _checkBanner(_buffer);
-                    } else {
-                        _inReset = false;
+                        local err = _checkBanner(_buffer);
+                        // Cancel init timeout timer
+                        if (_timeout) _cancelTimer(_timeout);
+                        if (_initCB) {
+                            imp.wakeup(0, function() {
+                                _initCB(err);
+                                _initCB = null;
+                            }.bindenv(this));
+                        } else if (err) {
+                            server.error(err);
+                        }
                     }
+                    _inReset = false;
                 } else if (_receiveHandler) {
                     _receiveHandler(_buffer);
                 }
+
+                // Send next command
+                local queueLen = _sendQueue.len();
+                if (queueLen > 0) {
+                    // Toggle _sending flag
+                    _sending = false;
+                    // Send next command
+                    send(_sendQueue.remove(0));
+                } else if (queueLen == 0 && _sending) {
+                    _sending = false;
+                }
+
                 _clearBuffer();
             }
             b = _uart.read();
@@ -154,11 +167,12 @@ class RN2xxx {
         _buffer = "";
     }
 
-    function _checkBanner(data) {
-        // Cancel init timeout timer
-        imp.cancelwakeup(_timeout);
-        _timeout = null;
+    function _cancelTimer(timer) {
+        imp.cancelwakeup(timer);
+        timer = null;
+    }
 
+    function _checkBanner(data) {
         local err = null;
 
         // Check for the expected banner
@@ -167,14 +181,7 @@ class RN2xxx {
             err = ERROR_BANNER_MISMATCH;
         }
 
-        if (_initCB) {
-            _initCB(err);
-        } else if (err) {
-            server.error(err);
-        }
-
-        // Clear reset flag
-        _inReset = false;
+        return err;
     }
 
     function _initTimeoutHandler() {
