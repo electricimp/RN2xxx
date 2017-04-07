@@ -29,13 +29,12 @@
     }
 
     /**
-     * Test hwReset
+     * Test hwReset no callback
      */
-    function testHardwareReset() {
+    function testHardwareResetNoCB() {
         return Promise(function (resolve, reject) {
             local counter = 0;
             local newFreq = "915000000";
-            local errUnexpectedRes = "Received unexpected response from module";
             lora.setReceiveHandler(function(res) {
                 counter++;
                 switch (counter) {
@@ -52,6 +51,12 @@
                         } catch(e) {
                             reject(e);
                         }
+
+                        // Reset
+                        lora.hwReset();
+                        // Confirm Freq changed back to defualt
+                        lora.send("radio get freq");
+
                         break;
                     case 3:
                         try {
@@ -67,13 +72,57 @@
             lora.send("radio set freq " + newFreq);
             // Confirm Change
             lora.send("radio get freq");
-            // Make sure Freq change has time to complete
-            imp.wakeup(5, function() {
-                // Reset
-                lora.hwReset();
-                // Confirm Freq changed back to defualt
-                lora.send("radio get freq");
+        }.bindenv(this))
+    }
+
+    /**
+     * Test hwReset with cb
+     */
+    function testHardwareResetCB() {
+        return Promise(function (resolve, reject) {
+            local counter = 0;
+            local newFreq = "915555000";
+            lora.setReceiveHandler(function(res) {
+                counter++;
+                switch (counter) {
+                    case 1:
+                        try {
+                            this.assertEqual(res, "ok");
+                        } catch(e) {
+                            reject(e)
+                        }
+                        break;
+                    case 2:
+                        try {
+                            this.assertEqual(newFreq, res);
+                        } catch(e) {
+                            reject(e);
+                        }
+
+                        // Reset
+                        lora.hwReset(function(err) {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                // Confirm Freq changed back to defualt
+                                lora.send("radio get freq");
+                            }
+                        }.bindenv(this));
+                        break;
+                    case 3:
+                        try {
+                            this.assertEqual(defaultFreq, res);
+                            resolve("Reset restored default settings")
+                        } catch(e) {
+                            reject(e);
+                        }
+                        break;
+                }
             }.bindenv(this));
+            // Change Freq
+            lora.send("radio set freq " + newFreq);
+            // Confirm Change
+            lora.send("radio get freq");
         }.bindenv(this))
     }
 
@@ -84,7 +133,6 @@
         return Promise(function (resolve, reject) {
             local counter = 0;
             local newFreq = "905550000";
-            local errUnexpectedRes = "Received unexpected response from module";
             lora.setReceiveHandler(function(res) {
                 counter++;
                 switch (counter) {

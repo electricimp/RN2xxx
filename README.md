@@ -8,7 +8,7 @@ This library provides driver code for Microchip’s [RN2903](http://ww1.microchi
 
 ### Constructor: RN2xxx(*uart, reset[, debug]*)
 
-The constructor takes two required parameters to instantiate the class: *uart* the uart bus that the chip is connected to, and *reset* the pin the module's reset pin is connected to. The reset pin must be active low. The constructor will configure the reset pin. The optional *debug* parameter is a boolean that enables debug logging on incoming and outgoing uart traffic.
+The constructor takes two required parameters to instantiate the class: *uart* the uart bus that the chip is connected to, and *reset* the pin the module's reset pin is connected to. The reset pin must be active low. The constructor will configure the reset pin. To configure the UART call the *init()* method.  The optional *debug* parameter is a boolean that enables debug logging on incoming and outgoing uart traffic.
 
 ```squirrel
 local UART = hardware.uart1;
@@ -21,7 +21,7 @@ lora <- RN2xxx(UART, RESET_PIN);
 
 ### init(*banner[, callback]*)
 
-The *init()* method configures the uart and checks for the module's expected banner. The method takes one required parameter *banner*, RN2xxx.RN2903_BANNER for the RN2903 module or RN2xxx.RN2483 for the RN2483 module, and one optional parameter *callback*, a function that will run when the initialization has completed. The *callback* function takes one parameter, it will contain an error message if initialization fails or null if initialization was successful.
+The *init()* method configures the UART and checks for the module's expected banner. The method takes one required parameter *banner*, RN2xxx.RN2903_BANNER for the RN2903 module or RN2xxx.RN2483 for the RN2483 module, and one optional parameter *callback*, a function that will run when the initialization has completed. The *callback* function takes one parameter, it will contain an error message if initialization fails or null if initialization was successful.
 
 ```
 lora.init(RN2xxx.RN2903_BANNER function(err) {
@@ -33,12 +33,14 @@ lora.init(RN2xxx.RN2903_BANNER function(err) {
 });
 ```
 
-### hwReset()
+### hwReset(*[callback]*)
 
-The *hwReset()* method toggles the reset pin. This method blocks for 0.01 seconds.
+The *hwReset()* method toggles the reset pin. This method takes one optional parameter *callback*, a function that will run when the reset has completed. The *callback* function takes one parameter, it will contain an error message if reset fails or null if rest was successful. Note this method blocks for 0.01 of a second.
 
 ```
-lora.hwReset()
+lora.hwReset(function(err) {
+  if (err) server.error(err);
+})
 ```
 
 ### send(*command*)

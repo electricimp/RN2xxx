@@ -37,7 +37,7 @@ class RN2xxx {
     static FIRST_ASCII_PRINTABLE_CHAR = 32;
     static RN2903_BANNER = "RN2903";
     static RN2483_BANNER = "RN2483";
-    static INIT_TIMEOUT = 5;
+    static RESET_TIMEOUT = 5;
 
     // Error messages
     static ERROR_BANNER_MISMATCH = "LoRa banner mismatch";
@@ -50,7 +50,7 @@ class RN2xxx {
     // Variables
     _timeout = null;
     _inReset = false;
-    _initCB = null;
+    _resetCB = null;
     _banner = null;
 
     _buffer = null;
@@ -75,25 +75,28 @@ class RN2xxx {
     function init(banner, cb = null) {
         // Set reset flag
         _inReset = true;
-        // Set init callback
-        _initCB = cb;
+        // Set callback
+        _resetCB = cb;
         // Set banner
         _banner = banner;
 
         // Hold reset pin low (active)
         _reset.write(0);
-        // Start initialization timeout timer
-        _timeout = imp.wakeup(INIT_TIMEOUT, _initTimeoutHandler.bindenv(this));
+        // Start timeout timer
+        _timeout = imp.wakeup(RESET_TIMEOUT, _initTimeoutHandler.bindenv(this));
         // Configure UART, _uartReceive handler will receive a banner to check
         _uart.configure(BAUD_RATE, WORD_SIZE, PARITY_NONE, STOP_BITS, NO_CTSRTS, _uartReceive.bindenv(this));
         // Release reset pin
         _reset.write(1);
     }
 
-    function hwReset() {
+    function hwReset(cb = null) {
         // Toggle reset flag
         _inReset = true;
+        _resetCB = cb;
         _reset.write(0);
+        // Start timeout timer
+        _timeout = imp.wakeup(RESET_TIMEOUT, _initTimeoutHandler.bindenv(this));
         imp.sleep(0.01);
         _reset.write(1);
     }
@@ -113,9 +116,9 @@ class RN2xxx {
     }
 
     function _uartReceive() {
-        local b = _uart.read();
         // Only printable charaters are expected in a response
         // All responses end in a line feed
+        local b = _uart.read();
         while(b >= 0) {
             // Add expected charaters to buffer
             if (b >= FIRST_ASCII_PRINTABLE_CHAR) {
@@ -126,41 +129,42 @@ class RN2xxx {
                 _log("received: " + _buffer);
 
                 // Pass recieved data to handler & clear buffer
-                if (_inReset) {
-                    // Only check banner if we have one
-                    if (_banner) {
-                        local err = _checkBanner(_buffer);
-                        // Cancel init timeout timer
-                        if (_timeout) _cancelTimer(_timeout);
-                        if (_initCB) {
-                            imp.wakeup(0, function() {
-                                _initCB(err);
-                                _initCB = null;
-                            }.bindenv(this));
-                        } else if (err) {
-                            server.error(err);
-                        }
-                    }
-                    _inReset = false;
-                } else if (_receiveHandler) {
-                    _receiveHandler(_buffer);
-                }
+                _processBuffer(_buffer);
 
                 // Send next command
                 local queueLen = _sendQueue.len();
                 if (queueLen > 0) {
-                    // Toggle _sending flag
                     _sending = false;
-                    // Send next command
                     send(_sendQueue.remove(0));
                 } else if (queueLen == 0 && _sending) {
                     _sending = false;
                 }
-
-                _clearBuffer();
             }
             b = _uart.read();
         }
+    }
+
+    function _processBuffer(buffer) {
+        if (_inReset) {
+           // Check banner if we have one
+            local err = (_banner) ? _checkBanner(buffer) : null;
+            // Cancel reset timer
+            if (_timeout) _cancelTimer(_timeout);
+            // Trigger reset Callback, or log error
+            if (_resetCB) {
+                imp.wakeup(0, function() {
+                    _resetCB(err);
+                    _resetCB = null;
+                }.bindenv(this));
+            } else if (err) {
+                server.error(err);
+            }
+            // Toggle reset flag
+            _inReset = false;
+        } else if (_receiveHandler) {
+            _receiveHandler(buffer);
+        }
+        _clearBuffer();
     }
 
     function _clearBuffer() {
@@ -173,19 +177,16 @@ class RN2xxx {
     }
 
     function _checkBanner(data) {
-        local err = null;
-
         // Check for the expected banner
         if (data.slice(0, _banner.len()) != _banner) {
-            _log( data.slice(0, _banner.len()) );
-            err = ERROR_BANNER_MISMATCH;
+            _log(_banner);
+            return ERROR_BANNER_MISMATCH;
         }
-
-        return err;
+        return null;
     }
 
     function _initTimeoutHandler() {
-        (_initCB) ? _initCB(ERROR_BANNER_TIMEOUT) : server.error(ERROR_BANNER_TIMEOUT);
+        (_resetCB) ? _resetCB(ERROR_BANNER_TIMEOUT) : server.error(ERROR_BANNER_TIMEOUT);
         // Clear reset flag
         _inReset = false;
         _timeout = null;
