@@ -37,7 +37,7 @@ class RN2xxx {
     static FIRST_ASCII_PRINTABLE_CHAR = 32;
     static RN2903_BANNER = "RN2903";
     static RN2483_BANNER = "RN2483";
-    static RESET_TIMEOUT = 5;
+    static RESET_TIMEOUT_SEC = 5;
 
     // Error messages
     static ERROR_BANNER_MISMATCH = "LoRa banner mismatch";
@@ -82,8 +82,10 @@ class RN2xxx {
 
         // Hold reset pin low (active)
         _reset.write(0);
+        // Cancel reset timer
+        _cancelTimer(_timeout);
         // Start timeout timer
-        _timeout = imp.wakeup(RESET_TIMEOUT, _initTimeoutHandler.bindenv(this));
+        _timeout = imp.wakeup(RESET_TIMEOUT_SEC, _initTimeoutHandler.bindenv(this));
         // Configure UART, _uartReceive handler will receive a banner to check
         _uart.configure(BAUD_RATE, WORD_SIZE, PARITY_NONE, STOP_BITS, NO_CTSRTS, _uartReceive.bindenv(this));
         // Release reset pin
@@ -95,8 +97,10 @@ class RN2xxx {
         _inReset = true;
         _resetCB = cb;
         _reset.write(0);
+        // Cancel reset timer
+        _cancelTimer(_timeout);
         // Start timeout timer
-        _timeout = imp.wakeup(RESET_TIMEOUT, _initTimeoutHandler.bindenv(this));
+        _timeout = imp.wakeup(RESET_TIMEOUT_SEC, _initTimeoutHandler.bindenv(this));
         imp.sleep(0.01);
         _reset.write(1);
     }
@@ -146,10 +150,10 @@ class RN2xxx {
 
     function _processBuffer(buffer) {
         if (_inReset) {
+            // Cancel reset timer
+            _cancelTimer(_timeout);
            // Check banner if we have one
             local err = (_banner) ? _checkBanner(buffer) : null;
-            // Cancel reset timer
-            if (_timeout) _cancelTimer(_timeout);
             // Trigger reset Callback, or log error
             if (_resetCB) {
                 imp.wakeup(0, function() {
@@ -172,8 +176,10 @@ class RN2xxx {
     }
 
     function _cancelTimer(timer) {
-        imp.cancelwakeup(timer);
-        timer = null;
+        if (timer != null) {
+            imp.cancelwakeup(timer);
+            timer = null;
+        }
     }
 
     function _checkBanner(data) {
