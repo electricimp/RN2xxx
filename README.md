@@ -104,7 +104,7 @@ const RADIO_CRC = "on"; // crc header enabled
 const RADIO_SYNC_WORD = 12;
 const RADIO_WATCHDOG_TIMEOUT = 0;
 const RADIO_POWER_OUT = 14;
-const RADIO_RX_WINDOW_SIZE = 0; // contiuous mode
+const RADIO_RX_WINDOW_SIZE = 0; // continuous mode
 
 // LoRa Commands
 const MAC_PAUSE = "mac pause";
