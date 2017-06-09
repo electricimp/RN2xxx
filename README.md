@@ -1,64 +1,72 @@
 # RN2xxx
 
-This library provides driver code for Microchip’s [RN2903](http://ww1.microchip.com/downloads/en/DeviceDoc/50002390B.pdf) and [RN2483](http://ww1.microchip.com/downloads/en/DeviceDoc/50002346A.pdf) Low-Power Long Range LoRa Technology Transceiver modules.  These modules provide low-power solution for long range wireless data transmission that complies with the LoRaWAN Class A protocol specifications.
+This library provides driver code for Microchip’s [RN2903](http://ww1.microchip.com/downloads/en/DeviceDoc/50002390B.pdf) and [RN2483](http://ww1.microchip.com/downloads/en/DeviceDoc/50002346A.pdf) Low-Power Long-Range (LoRa) transceiver modules.  These modules provide low-power solution for long range wireless data transmission that complies with the LoRaWAN Class A protocol specifications.
 
-**To use this library, add `#require "RN2xxx.device.nut:1.0.0"` to the top of your device code.**
+**To use this library, add** `#require "RN2xxx.device.nut:1.0.0"` **to the top of your device code.**
 
 ## Class Usage
 
 ### Constructor: RN2xxx(*uart, reset[, debug]*)
 
-The constructor takes two required parameters to instantiate the class: *uart* the uart bus that the chip is connected to, and *reset* the pin the module's reset pin is connected to. The reset pin must be active low. The constructor will configure the reset pin. The optional *debug* parameter is a boolean that enables debug logging on incoming and outgoing uart traffic.
+The constructor takes two required parameters to instantiate the class: the UART bus that the chip is connected to, and the imp GPIO pin that the module's reset pin is connected to. The reset pin must be active low. The constructor will configure the reset pin. To configure the UART, call the *init()* method.
+
+The optional *debug* parameter is a boolean that enables debug logging on incoming and outgoing UART traffic.
 
 ```squirrel
-local UART = hardware.uart1;
-local RESET_PIN = hardware.pinH;
+local uart = hardware.uart1;
+local resetPin = hardware.pinH;
 
-lora <- LoRa_RN2xxx(UART, RESET_PIN);
+lora <- RN2xxx(uart, resetPin, true);
 ```
 
 ## Class Methods
 
 ### init(*banner[, callback]*)
 
-The *init()* method configures the uart and checks for the module's expected banner. The method takes one required parameter *banner*, RN2xxx.RN2903_BANNER for the RN2903 module or RN2xxx.RN2483 for the RN2483 module, and one optional parameter *callback*, a function that will run when the initialization has completed. The *callback* function takes one parameter, it will contain an error message if initialization fails or null if initialization was successful.
+The *init()* method configures the UART and checks for the module’s expected banner. The method takes one required parameter, *banner*, which should be passed the constant *RN2xxx.RN2903_BANNER* for the RN2903 module, or *RN2xxx.RN2483* for the RN2483 module.
+
+The method can also take an optional parameter, *callback*, which is a reference to a function that will run when the initialization has completed. The callback takes one parameter, which will be passed an error message if the initialization failed or `null` if initialization was successful.
 
 ```
 lora.init(RN2xxx.RN2903_BANNER function(err) {
-  if (err) {
-    server.error(err);
-  } else {
-    lora.send("radio set mod lora");
-  }
+    if (err) {
+        server.error(err);
+    } else {
+        lora.send("radio set mod lora");
+    }
 });
 ```
 
-### hwReset()
+### hwReset(*[callback]*)
 
-The *hwReset()* method toggles the reset pin. This method blocks for 0.01 seconds.
+This method toggles the reset pin. It has one, optional parameter, *callback*, which is a function that will be run when the reset has completed. The callback takes one parameter, which will be passed an error message if the initialization failed or `null` if initialization was successful.
+
+**Note** This method blocks for 0.01 seconds.
 
 ```
-lora.hwReset()
+lora.hwReset(function(err) {
+    if (err) server.error(err);
+})
 ```
 
 ### send(*command*)
 
-The *send()* method takes one required parameter *command*, a string command. Here are the command references for each module: [RN2903](http://ww1.microchip.com/downloads/en/DeviceDoc/40001811A.pdf), [RN2483](http://ww1.microchip.com/downloads/en/DeviceDoc/40001784B.pdf). Below are some examples of a few different commands.
+This method sends a command to the LoRa module. The command is provided in the form of a string. Here are the command references for each module: [RN2903](http://ww1.microchip.com/downloads/en/DeviceDoc/40001811A.pdf) and [RN2483](http://ww1.microchip.com/downloads/en/DeviceDoc/40001784B.pdf). Below are some examples of a few different commands.
 
 ```
-// set the radio mode to lora
+// Set the radio mode to lora
 lora.send("radio set mod lora");
 
-// set the radio to continuous receive mode
+// Set the radio to continuous receive mode
 lora.send("radio rx 0");
 
-// send "TX OK" message
+// Send "TX OK" message
 lora.send("radio tx FF0000005458204F4B00");
 ```
 
 ### setReceiveHandler(*receiveCallback*)
 
-The *setReceiveHandler()* takes one required parameter *receiveCallback*, a function that will be called whenever a response or data is received. The *receiveCallback* takes one parameter the response/data received.
+This method registers a callback function that will be called whenever a response or data is received by the module. The *receiveCallback* function takes one parameter: the response or data received.
 
 ```
 function receive(data) {
@@ -66,6 +74,7 @@ function receive(data) {
         // We have received a packet
         // Add code to handle data here, for now just log the incoming data
         server.log(data);
+        
         // Send ACK
         lora.send("radio tx FF0000005458204F4B00");
     } else if (data == "radio_tx_ok" || data == "radio_err") {
@@ -77,10 +86,10 @@ function receive(data) {
     }
 }
 
-lora.setReceiveHandler(receive.bindenv(this));
+lora.setReceiveHandler(receive);
 ```
 
-## Full Example:
+## Full Example
 
 ```squirrel
 #require "RN2xxx.device.nut:1.0.0"
@@ -95,7 +104,7 @@ const RADIO_CRC = "on"; // crc header enabled
 const RADIO_SYNC_WORD = 12;
 const RADIO_WATCHDOG_TIMEOUT = 0;
 const RADIO_POWER_OUT = 14;
-const RADIO_RX_WINDOW_SIZE = 0; // contiuous mode
+const RADIO_RX_WINDOW_SIZE = 0; // continuous mode
 
 // LoRa Commands
 const MAC_PAUSE = "mac pause";
@@ -123,13 +132,14 @@ initCommands <- [ format("%s mod %s", RADIO_SET, RADIO_MODE),
 
 local UART = hardware.uart1;
 local RESET_PIN = hardware.pinH;
-lora <- LoRa_RN2483(UART, RESET_PIN);
+lora <- RN2xxx(UART, RESET_PIN, true);
 
 function receive(data) {
     if (data.len() > 10 && data.slice(0,10) == "radio_rx  ") {
         // We have received a packet
         // Add code to handle data here, for now just log the incoming data
         server.log(data);
+        
         // Send ACK
         lora.send( format("%s %s%s%s", RADIO_TX, TX_HEADER, ACK_COMMAND, TX_FOOTER) );
     } else if (data == "radio_tx_ok" || data == "radio_err") {
@@ -152,6 +162,7 @@ function sendNextInitCmd(data = null) {
         // Send command to LoRa
         lora.send(command);
     } else {
+        server.log("LoRa radio in receive mode...");
         // Radio ready to receive, set to our receive handler
         lora.setReceiveHandler(receive.bindenv(this));
     }
@@ -171,3 +182,7 @@ function loraInitHandler(err) {
 // Initialize LoRa Radio and open a receive handler
 lora.init(RN2xxx.RN2903_BANNER loraInitHandler);
 ```
+
+## License
+
+The RN2xxx library is licensed under the [MIT License](/LICENSE).
