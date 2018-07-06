@@ -2,7 +2,7 @@
 
 This library provides driver code for Microchip’s [RN2903](http://ww1.microchip.com/downloads/en/DeviceDoc/50002390B.pdf) and [RN2483](http://ww1.microchip.com/downloads/en/DeviceDoc/50002346A.pdf) Low-Power Long Range LoRa Technology Transceiver modules.  These modules provide low-power solution for long range wireless data transmission that complies with the LoRaWAN Class A protocol specifications.
 
-**To use this library, add `#require "RN2xxx.device.nut:1.0.0"` to the top of your device code.**
+**To use this library, add `#require "RN2xxx.device.lib.nut:1.0.0"` to the top of your device code.**
 
 ## Class Usage
 
@@ -83,7 +83,7 @@ lora.setReceiveHandler(receive.bindenv(this));
 ## Full Example:
 
 ```squirrel
-#require "RN2xxx.device.nut:1.0.0"
+#require "RN2xxx.device.lib.nut:1.0.0"
 
 // LoRa Settings
 const RADIO_MODE = "lora";
